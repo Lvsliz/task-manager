@@ -1,0 +1,241 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>任务工作日志</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}">
+</head>
+<body>
+    <div class="app-shell">
+        <aside class="sidebar" aria-label="主导航">
+            <div class="brand">
+                <div class="brand-mark" data-icon="app"></div>
+                <strong>Tasks</strong>
+            </div>
+
+            <button id="sidebarNewTaskButton" class="sidebar-create" type="button">
+                <span class="button-icon" data-icon="plus"></span>
+                新建任务
+            </button>
+
+            <nav class="nav-section" aria-label="任务视图">
+                <button class="nav-item active" type="button" data-view="current">
+                    <span class="nav-icon" data-icon="target"></span>
+                    当前任务
+                </button>
+                <button class="nav-item" type="button" data-view="all">
+                    <span class="nav-icon" data-icon="list"></span>
+                    全部任务
+                    <span id="allTaskCount" class="nav-count">0</span>
+                </button>
+                <button class="nav-item" type="button" data-view="attention">
+                    <span class="nav-icon" data-icon="lightbulb"></span>
+                    需关注
+                    <span id="attentionTaskCount" class="nav-count">0</span>
+                </button>
+                <button class="nav-item" type="button" data-view="completed">
+                    <span class="nav-icon" data-icon="checkCircle"></span>
+                    已完成
+                    <span id="completedTaskCount" class="nav-count">0</span>
+                </button>
+            </nav>
+
+            <div class="nav-section project-nav-section">
+                <p class="section-label">项目</p>
+                <div id="projectNav" class="project-nav scroll-surface"></div>
+            </div>
+
+            <div class="sidebar-footer">
+                <button id="settingsButton" class="settings-button" type="button">
+                    <span class="nav-icon" data-icon="gear"></span>
+                    设置
+                </button>
+            </div>
+        </aside>
+
+        <main class="workspace">
+            <section class="timeline-panel scroll-surface" aria-label="当前任务日志">
+                <div class="panel-header current-task-header">
+                    <div>
+                        <p class="eyebrow title-with-icon">
+                            <span class="title-icon" data-icon="target"></span>
+                            当前任务
+                        </p>
+                        <h1 id="timelineTaskName">快速记录</h1>
+                    </div>
+                </div>
+                <div id="timelineEmpty" class="empty-state">
+                    这个任务还没有日志。
+                </div>
+                <div id="timeline" class="timeline hidden"></div>
+            </section>
+
+            <div id="panelResizeHandle" class="panel-resize-handle" role="separator" aria-orientation="vertical" aria-label="调整任务列表宽度" title="拖动调整宽度，双击恢复默认"></div>
+
+            <aside class="tasks-panel scroll-surface" aria-label="任务列表">
+                <div class="panel-header tasks-header">
+                    <div>
+                        <p class="eyebrow title-with-icon">
+                            <span class="title-icon" data-icon="list"></span>
+                            任务列表
+                        </p>
+                        <div class="view-title-row">
+                            <button id="editCurrentProjectButton" class="view-title-action hidden" type="button" aria-label="编辑当前项目" title="编辑项目">
+                                <span class="button-icon" data-icon="pencil"></span>
+                            </button>
+                            <h2 id="taskListTitle">当前任务</h2>
+                        </div>
+                    </div>
+                    <div class="header-actions">
+                        <div id="staleIndicator" class="inline-reminder hidden" aria-label="需关注任务数量">
+                            <span data-icon="lightbulb"></span>
+                            <strong id="staleCount">0</strong>
+                        </div>
+                        <button id="newTaskButton" class="primary-button" type="button">
+                            <span class="button-icon" data-icon="plus"></span>
+                            新建任务
+                        </button>
+                    </div>
+                </div>
+
+                <div id="stalePanel" class="stale-panel hidden">
+                    <div class="stale-panel-header">
+                        <h3 class="title-with-icon">
+                            <span class="title-icon" data-icon="lightbulb"></span>
+                            需关注
+                        </h3>
+                    </div>
+                    <div id="staleList" class="stale-list"></div>
+                </div>
+
+                <div id="taskList" class="task-groups"></div>
+            </aside>
+        </main>
+    </div>
+
+    <form id="quickLogForm" class="quick-log-bar">
+        <textarea id="logInput" class="scroll-surface" rows="1" placeholder="写下快速进展，按 Enter 提交" autocomplete="off"></textarea>
+        <div class="time-controls">
+            <select id="timeMode" aria-label="日志时间">
+                <option value="now">现在</option>
+                <option value="today">今天较早</option>
+                <option value="yesterday">昨天</option>
+                <option value="custom">自定义</option>
+            </select>
+            <input id="timeValue" type="time" class="hidden" value="09:00" aria-label="选择时间">
+            <input id="customDateTime" type="datetime-local" class="hidden" aria-label="自定义时间">
+            <button id="durationButton" class="secondary-button hidden" type="button">+1h</button>
+            <span id="durationBadge" class="duration-badge hidden">1h</span>
+            <button class="primary-button" type="submit">记录</button>
+        </div>
+    </form>
+
+    <div id="taskModal" class="modal hidden">
+        <div class="modal-card">
+            <div class="modal-header">
+                <h3 id="taskModalTitle">新建任务</h3>
+            </div>
+            <form id="taskForm" class="modal-form">
+                <input id="taskIdInput" name="task_id" type="hidden">
+                <label>
+                    任务名称
+                    <input id="taskNameInput" name="name" type="text" required autocomplete="off">
+                </label>
+                <label>
+                    项目
+                    <select id="projectSelect" name="project_name" required></select>
+                </label>
+                <label id="newProjectLabel" class="hidden">
+                    新项目名称
+                    <input id="projectNameInput" name="project_name_custom" type="text" placeholder="项目名称">
+                </label>
+                <label id="taskStatusLabel" class="hidden">
+                    状态
+                    <select id="taskStatusSelect" name="status">
+                        <option value="active">进行中</option>
+                        <option value="completed">已完成</option>
+                    </select>
+                </label>
+                <label id="taskReminderLabel" class="hidden">
+                    超过多久提醒
+                    <select id="taskReminderSelect" name="remind_after_days">
+                        <option value="3">3 天</option>
+                        <option value="7">7 天</option>
+                        <option value="14">14 天</option>
+                        <option value="30">30 天</option>
+                    </select>
+                </label>
+                <label id="taskFolderLabel" class="hidden">
+                    相关文件夹路径
+                    <div class="folder-field">
+                        <input id="taskFolderInput" name="folder_path" type="text" placeholder="例如 D:\Work\项目资料">
+                        <button id="openTaskFolderFromModal" class="secondary-button compact-button" type="button">
+                            <span class="button-icon" data-icon="folder"></span>
+                            打开
+                        </button>
+                    </div>
+                </label>
+                <div class="modal-actions">
+                    <button id="cancelTaskModal" class="ghost-button" type="button">取消</button>
+                    <button id="saveTaskButton" class="primary-button" type="submit">保存任务</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <div id="settingsModal" class="modal hidden">
+        <div class="modal-card settings-card">
+            <div class="modal-header">
+                <h3 class="title-with-icon">
+                    <span class="title-icon" data-icon="gear"></span>
+                    设置
+                </h3>
+            </div>
+            <div class="settings-section">
+                <div>
+                    <h4>外观</h4>
+                    <p>选择适合长时间记录的浅色配色。</p>
+                </div>
+                <div id="themeOptions" class="theme-options" aria-label="主题色"></div>
+            </div>
+            <div class="settings-section">
+                <div>
+                    <h4>布局</h4>
+                    <p>恢复中间日志和右侧任务列表的默认宽度。</p>
+                </div>
+                <button id="resetLayoutWidthButton" class="secondary-button" type="button">
+                    恢复默认宽度
+                </button>
+            </div>
+            <div class="modal-actions">
+                <button id="closeSettingsModal" class="primary-button" type="button">完成</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="projectModal" class="modal hidden">
+        <div class="modal-card compact-modal-card">
+            <div class="modal-header">
+                <h3 class="title-with-icon">
+                    <span class="title-icon" data-icon="folder"></span>
+                    编辑项目
+                </h3>
+            </div>
+            <form id="projectForm" class="modal-form">
+                <input id="projectIdInput" type="hidden">
+                <label>
+                    项目名称
+                    <input id="projectNameEditInput" type="text" required autocomplete="off">
+                </label>
+                <div class="modal-actions">
+                    <button id="cancelProjectModal" class="ghost-button" type="button">取消</button>
+                    <button class="primary-button" type="submit">保存</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <script src="{{ url_for('static', filename='app.js') }}"></script>
+</body>
+</html>
