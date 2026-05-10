@@ -1,6 +1,8 @@
 # Personal Task-Based Work Log
 
 A lightweight personal task-driven work log system.
+<img width="3828" height="1931" alt="image" src="https://github.com/user-attachments/assets/0afaab1d-0563-4bc1-b594-c7b19571b1e7" />
+
 
 ## Stack
 
