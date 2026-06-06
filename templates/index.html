@@ -1,0 +1,470 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>任务工作日志</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}">
+</head>
+<body>
+    <div class="app-shell">
+        <aside class="sidebar" aria-label="主导航">
+            <div class="brand">
+                <div class="brand-mark" data-icon="app"></div>
+                <strong>Tasks</strong>
+            </div>
+
+            <button id="sidebarNewTaskButton" class="sidebar-create" type="button">
+                <span class="button-icon" data-icon="sparkles"></span>
+                任务分析
+            </button>
+
+            <nav class="nav-section" aria-label="任务视图">
+                <button class="nav-item active" type="button" data-view="current">
+                    <span class="nav-icon" data-icon="target"></span>
+                    进行中
+                </button>
+                <button class="nav-item" type="button" data-view="all">
+                    <span class="nav-icon" data-icon="list"></span>
+                    全部任务
+                    <span id="allTaskCount" class="nav-count">0</span>
+                </button>
+                <button class="nav-item" type="button" data-view="attention">
+                    <span class="nav-icon" data-icon="lightbulb"></span>
+                    需关注
+                    <span id="attentionTaskCount" class="nav-count">0</span>
+                </button>
+                <button class="nav-item" type="button" data-view="completed">
+                    <span class="nav-icon" data-icon="checkCircle"></span>
+                    已完成
+                    <span id="completedTaskCount" class="nav-count">0</span>
+                </button>
+            </nav>
+
+            <div class="nav-section project-nav-section">
+                <p class="section-label">项目</p>
+                <div id="projectNav" class="project-nav scroll-surface"></div>
+            </div>
+
+            <div class="sidebar-footer">
+                <button id="boardSyncButton" class="settings-button" type="button">
+                    <span class="nav-icon" data-icon="upload"></span>
+                    同步看板
+                </button>
+                <button id="settingsButton" class="settings-button" type="button">
+                    <span class="nav-icon" data-icon="gear"></span>
+                    设置
+                </button>
+            </div>
+        </aside>
+
+        <main class="workspace">
+            <section class="timeline-panel scroll-surface" aria-label="当前任务日志">
+                <div class="panel-header current-task-header">
+                    <div class="tasks-header-title">
+                        <p class="eyebrow title-with-icon">
+                            <span class="title-icon" data-icon="target"></span>
+                            当前任务
+                        </p>
+                        <h1 id="timelineTaskName">快速记录</h1>
+                    </div>
+                    <button id="analyzeCurrentTaskButton" class="secondary-button current-analysis-button" type="button">
+                        <span class="button-icon" data-icon="sparkles"></span>
+                        快速分析
+                    </button>
+                </div>
+                <div id="timelineEmpty" class="empty-state">
+                    这个任务还没有日志。
+                </div>
+                <div id="timeline" class="timeline hidden"></div>
+            </section>
+
+            <div id="panelResizeHandle" class="panel-resize-handle" role="separator" aria-orientation="vertical" aria-label="调整任务列表宽度" title="拖动调整宽度，双击恢复默认"></div>
+
+            <aside class="tasks-panel scroll-surface" aria-label="任务列表">
+                <div class="panel-header tasks-header">
+                    <div>
+                        <p class="eyebrow title-with-icon">
+                            <span class="title-icon" data-icon="list"></span>
+                            任务列表
+                        </p>
+                        <div class="view-title-row">
+                            <button id="editCurrentProjectButton" class="view-title-action hidden" type="button" aria-label="编辑当前项目" title="编辑项目">
+                                <span class="button-icon" data-icon="pencil"></span>
+                            </button>
+                            <h2 id="taskListTitle">当前任务</h2>
+                        </div>
+                    </div>
+                    <div class="header-actions">
+                        <div id="staleIndicator" class="inline-reminder hidden" aria-label="需关注任务数量">
+                            <span data-icon="lightbulb"></span>
+                            <strong id="staleCount">0</strong>
+                        </div>
+                        <button id="newTaskButton" class="primary-button" type="button">
+                            <span class="button-icon" data-icon="plus"></span>
+                            新建任务
+                        </button>
+                    </div>
+                </div>
+
+                <div id="stalePanel" class="stale-panel hidden">
+                    <div class="stale-panel-header">
+                        <h3 class="title-with-icon">
+                            <span class="title-icon" data-icon="lightbulb"></span>
+                            需关注
+                        </h3>
+                    </div>
+                    <div id="staleList" class="stale-list"></div>
+                </div>
+
+                <div id="taskList" class="task-groups"></div>
+            </aside>
+        </main>
+    </div>
+
+    <form id="quickLogForm" class="quick-log-bar">
+        <div id="logInput" class="scroll-surface" contenteditable="true" role="textbox" aria-multiline="true"></div>
+        <div class="time-controls">
+            <select id="timeMode" aria-label="日志时间">
+                <option value="now">现在</option>
+                <option value="today">今天较早</option>
+                <option value="yesterday">昨天</option>
+                <option value="custom">自定义</option>
+            </select>
+            <input id="timeValue" type="time" class="hidden" value="09:00" aria-label="选择时间">
+            <input id="customDateTime" type="datetime-local" class="hidden" aria-label="自定义时间">
+            <button id="durationButton" class="secondary-button hidden" type="button">+1h</button>
+            <span id="durationBadge" class="duration-badge hidden">1h</span>
+            <button class="primary-button" type="submit">记录</button>
+        </div>
+    </form>
+
+    <div id="taskModal" class="modal hidden">
+        <div class="modal-card">
+            <div class="modal-header">
+                <h3 id="taskModalTitle">新建任务</h3>
+            </div>
+            <form id="taskForm" class="modal-form">
+                <input id="taskIdInput" name="task_id" type="hidden">
+                <label>
+                    任务名称
+                    <input id="taskNameInput" name="name" type="text" required autocomplete="off">
+                </label>
+                <label>
+                    项目
+                    <select id="projectSelect" name="project_name" required></select>
+                </label>
+                <label id="newProjectLabel" class="hidden">
+                    新项目名称
+                    <input id="projectNameInput" name="project_name_custom" type="text" placeholder="项目名称">
+                </label>
+                <label id="taskStatusLabel" class="hidden">
+                    状态
+                    <select id="taskStatusSelect" name="status">
+                        <option value="active">进行中</option>
+                        <option value="completed">已完成</option>
+                    </select>
+                </label>
+                <label id="taskReminderLabel" class="hidden">
+                    超过多久提醒
+                    <select id="taskReminderSelect" name="remind_after_days">
+                        <option value="3">3 天</option>
+                        <option value="7">7 天</option>
+                        <option value="14">14 天</option>
+                        <option value="30">30 天</option>
+                    </select>
+                </label>
+                <label id="taskProgressLabel" class="hidden">
+                    当前进度
+                    <input id="taskProgressInput" name="progress_percent" type="number" min="0" max="100" step="1">
+                </label>
+                <label id="taskProgressStepLabel" class="hidden">
+                    进度步进
+                    <input id="taskProgressStepInput" name="progress_step" type="number" min="1" max="100" step="1">
+                </label>
+                <label id="taskEstimatedDaysLabel" class="hidden">
+                    预计耗时（天）
+                    <input id="taskEstimatedDaysInput" name="estimated_days" type="number" min="0.5" step="0.5">
+                </label>
+                <label id="taskFolderLabel" class="hidden">
+                    相关文件夹路径
+                    <div class="folder-field">
+                        <input id="taskFolderInput" name="folder_path" type="text" placeholder="例如 D:\Work\项目资料">
+                        <button id="openTaskFolderFromModal" class="secondary-button compact-button" type="button">
+                            <span class="button-icon" data-icon="folder"></span>
+                            打开
+                        </button>
+                    </div>
+                </label>
+                <div class="modal-actions">
+                    <button id="exportTaskButton" class="secondary-button export-task-button hidden" type="button">
+                        导出任务
+                    </button>
+                    <button id="importTaskButton" class="secondary-button import-task-button" type="button">
+                        导入任务文件
+                    </button>
+                    <input id="importTaskFileInput" type="file" class="hidden" accept=".md,text/markdown,text/plain">
+                    <button id="cancelTaskModal" class="ghost-button" type="button">取消</button>
+                    <button id="saveTaskButton" class="primary-button" type="submit">保存任务</button>
+                </div>
+                <p id="taskImportStatus" class="form-status" aria-live="polite"></p>
+            </form>
+        </div>
+    </div>
+
+    <div id="logEditModal" class="modal hidden">
+        <div class="modal-card log-edit-card">
+            <div class="modal-header">
+                <h3 class="title-with-icon">
+                    <span class="title-icon" data-icon="pencil"></span>
+                    编辑日志
+                </h3>
+            </div>
+            <form id="logEditForm" class="modal-form">
+                <label>
+                    日志内容
+                    <textarea id="logEditContentInput" class="log-edit-input" rows="8" required></textarea>
+                </label>
+                <p id="logEditHint" class="form-status"></p>
+                <div class="modal-actions">
+                    <button id="cancelLogEditModal" class="ghost-button" type="button">取消</button>
+                    <button id="saveLogEditButton" class="primary-button" type="submit">保存修改</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <div id="settingsModal" class="modal hidden">
+        <div class="modal-card settings-card">
+            <div class="settings-header">
+                <h3 class="title-with-icon">
+                    <span class="title-icon" data-icon="gear"></span>
+                    设置
+                </h3>
+                <button id="closeSettingsModal" class="primary-button" type="button">保存</button>
+            </div>
+            <div class="settings-scroll-body scroll-surface">
+                <div class="settings-section">
+                    <div>
+                        <h4>外观</h4>
+                        <p>选择适合长时间记录的浅色配色。</p>
+                    </div>
+                    <div id="themeOptions" class="theme-options" aria-label="主题色"></div>
+                </div>
+                <div class="settings-section">
+                    <div>
+                        <h4>布局</h4>
+                        <p>恢复中间日志和右侧任务列表的默认宽度。</p>
+                    </div>
+                    <button id="resetLayoutWidthButton" class="secondary-button" type="button">
+                        恢复默认宽度
+                    </button>
+                </div>
+                <div class="settings-section">
+                    <div>
+                        <h4>看板同步</h4>
+                        <p>把个人端的原始任务快照写入共享目录，供看板端统一读取和 AI 分析。</p>
+                    </div>
+                    <div class="board-sync-form">
+                        <label>
+                            人员名称
+                            <input id="boardSyncPersonInput" type="text" placeholder="例如 张三" autocomplete="off">
+                        </label>
+                        <label>
+                            同步目录
+                            <input id="boardSyncDirInput" type="text" placeholder="例如 \\server\team-worklog 或 D:\TeamWorklog">
+                        </label>
+                        <label>
+                            日志范围
+                            <select id="boardSyncLogScopeSelect">
+                                <option value="all">全部日志</option>
+                                <option value="recent_30">最近 30 天日志</option>
+                            </select>
+                        </label>
+                        <label class="checkbox-label">
+                            <input id="boardSyncAutoEnabledInput" type="checkbox">
+                            每天自动同步
+                        </label>
+                        <label>
+                            自动同步时间
+                            <input id="boardSyncAutoTimeInput" type="time" value="18:00">
+                        </label>
+                        <div class="settings-inline-actions">
+                            <button id="saveBoardSyncSettingsButton" class="secondary-button" type="button">保存同步设置</button>
+                            <button id="syncBoardNowButton" class="secondary-button" type="button">立即同步</button>
+                        </div>
+                        <p id="boardSyncStatus" class="settings-status"></p>
+                    </div>
+                </div>
+                <div class="settings-section">
+                    <div>
+                        <h4>AI 设置</h4>
+                        <p>配置 OpenAI-compatible API。API Key 会保存在本机配置文件中。</p>
+                    </div>
+                    <div class="ai-settings-form">
+                        <label>
+                            Base URL
+                            <input id="aiBaseUrlInput" type="url" placeholder="https://api.siliconflow.cn/v1" autocomplete="off">
+                        </label>
+                        <label>
+                            模型
+                            <input id="aiModelInput" type="text" placeholder="deepseek-ai/DeepSeek-V3" autocomplete="off">
+                        </label>
+                        <label>
+                            API Key
+                            <input id="aiApiKeyInput" type="password" placeholder="已保存则留空不修改" autocomplete="off">
+                        </label>
+                        <label class="checkbox-label">
+                            <input id="clearAiApiKeyInput" type="checkbox">
+                            清除已保存的 API Key
+                        </label>
+                        <div class="settings-inline-actions">
+                            <button id="saveAiSettingsButton" class="secondary-button" type="button">保存 AI 设置</button>
+                            <button id="testAiSettingsButton" class="secondary-button" type="button">测试连接</button>
+                        </div>
+                        <p id="aiSettingsStatus" class="settings-status"></p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div id="projectModal" class="modal hidden">
+        <div class="modal-card compact-modal-card">
+            <div class="modal-header">
+                <h3 class="title-with-icon">
+                    <span class="title-icon" data-icon="folder"></span>
+                    编辑项目
+                </h3>
+            </div>
+            <form id="projectForm" class="modal-form">
+                <input id="projectIdInput" type="hidden">
+                <label>
+                    项目名称
+                    <input id="projectNameEditInput" type="text" required autocomplete="off">
+                </label>
+                <div class="modal-actions">
+                    <button id="cancelProjectModal" class="ghost-button" type="button">取消</button>
+                    <button class="primary-button" type="submit">保存</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <div id="analysisCenterModal" class="modal hidden">
+        <div class="modal-card analysis-center-card">
+            <div class="analysis-header">
+                <h3 class="title-with-icon">
+                    <span class="title-icon" data-icon="sparkles"></span>
+                    任务分析
+                </h3>
+                <button id="closeAnalysisCenterModal" class="primary-button" type="button">关闭</button>
+            </div>
+            <div class="analysis-center-content scroll-surface">
+                <section class="analysis-center-section">
+                    <div class="section-heading">
+                        <h4>阶段总结</h4>
+                        <p>基于时间范围内的日志生成周报、月报或自定义阶段总结。</p>
+                    </div>
+                    <div class="period-summary-actions">
+                        <button id="weeklySummaryButton" class="secondary-button" type="button">生成本周总结</button>
+                        <button id="halfMonthSummaryButton" class="secondary-button" type="button">生成半月总结</button>
+                        <button id="monthlySummaryButton" class="secondary-button" type="button">生成本月总结</button>
+                        <button id="halfYearSummaryButton" class="secondary-button" type="button">生成半年总结</button>
+                        <button id="yearSummaryButton" class="secondary-button" type="button">生成一年总结</button>
+                    </div>
+                    <div class="period-summary-custom">
+                        <label>
+                            开始日期
+                            <input id="summaryStartDate" type="date">
+                        </label>
+                        <label>
+                            结束日期
+                            <input id="summaryEndDate" type="date">
+                        </label>
+                        <button id="customSummaryButton" class="secondary-button" type="button">生成自定义总结</button>
+                    </div>
+                    <p id="periodSummaryStatus" class="settings-status"></p>
+                </section>
+
+                <section class="analysis-center-section">
+                    <div class="section-heading">
+                        <h4>分析历史</h4>
+                        <p>最近生成的任务分析记录。</p>
+                    </div>
+                    <div class="analysis-export-actions">
+                        <button id="startAnalysisExportButton" class="secondary-button" type="button">导出</button>
+                        <button id="exportSelectedAnalysisButton" class="secondary-button hidden" type="button" disabled>导出选中</button>
+                        <button id="exportAllAnalysisButton" class="secondary-button hidden" type="button">导出全部</button>
+                        <button id="cancelAnalysisExportButton" class="ghost-button hidden" type="button">取消</button>
+                    </div>
+                    <div id="analysisHistoryList" class="analysis-history-list"></div>
+                </section>
+
+                <section class="analysis-center-section">
+                    <div class="section-heading">
+                        <h4>快速分析</h4>
+                        <p>当前任务仍可在中间标题区域直接分析；这里先保留为后续选择任务分析入口。</p>
+                    </div>
+                    <button id="analysisCenterCurrentTaskButton" class="secondary-button" type="button">
+                        <span class="button-icon" data-icon="target"></span>
+                        分析当前任务
+                    </button>
+                </section>
+
+                <section class="analysis-center-section">
+                    <div class="section-heading">
+                        <h4>提示词设置</h4>
+                        <p>选择一种分析类型，然后编辑对应的分析提示词。任务数据会由系统自动附加。</p>
+                    </div>
+                    <label class="analysis-prompt-type">
+                        分析类型
+                        <select id="analysisPromptTypeSelect">
+                            <option value="task">快速分析</option>
+                            <option value="week">周报总结</option>
+                            <option value="half_month">半月总结</option>
+                            <option value="month">月报总结</option>
+                            <option value="half_year">半年总结</option>
+                            <option value="year">年度总结</option>
+                            <option value="range">自定义阶段总结</option>
+                        </select>
+                    </label>
+                    <label class="analysis-prompt-type">
+                        风格预设
+                        <select id="analysisPromptPresetSelect">
+                            <option value="custom">自定义</option>
+                            <option value="pragmatic">务实复盘</option>
+                            <option value="brief">简约总结</option>
+                            <option value="manager">管理汇报</option>
+                            <option value="risk">风险排查</option>
+                            <option value="action">行动计划</option>
+                            <option value="four_f">4F 复盘</option>
+                        </select>
+                    </label>
+                    <textarea id="taskAnalysisPromptInput" class="analysis-prompt-input" rows="11"></textarea>
+                    <div class="settings-inline-actions">
+                        <button id="saveTaskAnalysisPromptButton" class="secondary-button" type="button">保存提示词</button>
+                        <button id="resetTaskAnalysisPromptButton" class="ghost-button" type="button">恢复默认</button>
+                    </div>
+                    <p id="taskAnalysisPromptStatus" class="settings-status"></p>
+                </section>
+            </div>
+        </div>
+    </div>
+
+    <div id="analysisModal" class="modal hidden">
+        <div class="modal-card analysis-card">
+            <div class="analysis-header">
+                <h3 id="analysisModalTitle" class="title-with-icon">
+                    <span class="title-icon" data-icon="sparkles"></span>
+                    任务分析
+                </h3>
+                <button id="closeAnalysisModal" class="primary-button" type="button">关闭</button>
+            </div>
+            <div id="analysisContent" class="analysis-content scroll-surface"></div>
+        </div>
+    </div>
+
+    <script src="{{ url_for('static', filename='app.js') }}"></script>
+</body>
+</html>
